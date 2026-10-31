@@ -1,0 +1,15 @@
+# 早期精选词表：代码已不引用，仅本地保留，不纳入仓库
+dict-builtin.txt
+
+# 系统与编辑器垃圾
+.DS_Store
+Thumbs.db
+desktop.ini
+*.swp
+.idea/
+.vscode/
+
+# 本地调试残留
+*.log
+*.bak
+*.tmp

@@ -1,0 +1,42 @@
+{
+  "manifest_version": 3,
+  "name": "外刊阅读",
+  "version": "0.1.0",
+  "description": "点词查义、双击入生词本、拖选词组/句子翻译 —— 直接在网页上读外刊。",
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAudmQjZFByMDGcbHfEztf+Z1R2IkEERuXk87OXG2ZDuc+uXjMm3nOwu8RCktmOBYrzAm2mR2SNI/Ll39TvXAll9OgyKtUlh4oXVox+zNw83epEG59jxGvu5RoGKbfkMAQomMew7MsJjwCL49lVubeahb8uCuJjzGuIbeHjswgvE4hechgIGT9t69ip7udU6z9OGaEunuEaTn3wF89LmD7Hk9PHiT41OaNMvLBxjSm+G7tSJylICu6Y6lICwLQiXDxTYmcZ2NgenMOqpqZEiIs/4kXu666FeG01OG3TQJjOsIRxo12UP49A9I1zkDJXjuVTKY3xqSl1N4eVGgiR0TKPwIDAQAB",
+  "permissions": ["storage", "activeTab", "scripting"],
+  "host_permissions": [
+    "https://api.mymemory.translated.net/*",
+    "https://translate.googleapis.com/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_title": "外刊阅读（点此开关）",
+    "default_popup": "panel.html"
+  },
+  "side_panel": {
+    "default_path": "panel.html"
+  },
+  "icons": {
+    "16": "icon16.png",
+    "48": "icon48.png",
+    "128": "icon128.png"
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["engine.js", "content.js"],
+      "css": ["content.css"],
+      "run_at": "document_idle",
+      "all_frames": false
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": ["bridge.html", "dict-builtin.txt", "dict-ecdict.txt", "dict-lemmas.txt"],
+      "matches": []
+    }
+  ]
+}

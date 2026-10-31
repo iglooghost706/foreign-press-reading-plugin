@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-wk-theme="light">
+<head>
+<meta charset="utf-8" />
+<title>外刊阅读</title>
+<link rel="stylesheet" href="panel.css" />
+</head>
+<body data-wk-theme="light">
+  <header class="hd">
+    <div class="hd-l">
+      <b class="logo">外刊阅读</b>
+      <span id="dictNote" class="dict-note">词典加载中…</span>
+    </div>
+    <div class="hd-r">
+      <button id="btnOn" class="pill on" title="在网页上一键开关">● 开启</button>
+    </div>
+  </header>
+
+  <nav class="tabs">
+    <button class="tab active" data-tab="bank">生词本</button>
+    <button class="tab" data-tab="repo">仓库</button>
+    <button class="tab" data-tab="note">笔记</button>
+    <button class="tab" data-tab="quiz">测试</button>
+    <button class="tab" data-tab="set">设置</button>
+  </nav>
+
+  <!-- ============ 生词本 ============ -->
+  <section class="page active" data-page="bank">
+    <div class="bar">
+      <input id="bankQ" class="inp" type="search" placeholder="搜索单词 / 释义…" />
+      <select id="bankSort" class="sel">
+        <option value="time">按时间</option>
+        <option value="alpha">按字母</option>
+        <option value="key">按重点</option>
+      </select>
+    </div>
+    <div class="bar" id="bankSubSortWrap" hidden>
+      <label class="sub-lb" for="bankSubSort">区内排序</label>
+      <select id="bankSubSort" class="sel">
+        <option value="time">按时间</option>
+        <option value="alpha">按字母</option>
+      </select>
+    </div>
+    <div class="bar2">
+      <span id="bankCount" class="muted">0 词</span>
+      <span class="sp"></span>
+      <button id="btnExportAnki" class="btn">导出 Anki</button>
+      <button id="btnExportTxt" class="btn">导出 TXT</button>
+      <button id="btnImport" class="btn">导入</button>
+      <button id="btnClearBank" class="btn danger">清空</button>
+      <input id="fileImport" type="file" accept=".txt,.tsv,.csv" hidden />
+    </div>
+    <div id="bankList" class="list"></div>
+  </section>
+
+  <!-- ============ 仓库 ============ -->
+  <section class="page" data-page="repo">
+    <div class="bar">
+      <input id="repoQ" class="inp" type="search" placeholder="搜索收藏 / 笔记…" />
+      <select id="repoSort" class="sel">
+        <option value="time">按时间</option>
+        <option value="source">按来源</option>
+      </select>
+    </div>
+    <div class="bar2">
+      <span id="repoCount" class="muted">0 条</span>
+      <span class="sp"></span>
+      <button id="btnAddLink" class="btn" title="收藏当前正在浏览的文章网址">收藏当前网址</button>
+      <button id="btnExportRepo" class="btn">导出</button>
+      <button id="btnClearRepo" class="btn danger">清空</button>
+    </div>
+    <div id="repoList" class="list"></div>
+  </section>
+
+  <!-- ============ 笔记：独立笔记列表（不绑定收藏） ============ -->
+  <section class="page" data-page="note">
+    <div class="bar">
+      <input id="noteQ" class="inp" type="search" placeholder="搜索笔记…" />
+    </div>
+    <div class="bar2">
+      <span id="noteCount" class="muted">0 条</span>
+      <span class="sp"></span>
+      <button id="btnNewNote" class="btn" title="新建一条独立笔记">＋ 新建笔记</button>
+    </div>
+    <div id="noteList" class="list"></div>
+  </section>
+
+  <!-- ============ 测试：从生词本随机抽词，点单词看释义 ============ -->
+  <section class="page" data-page="quiz">
+    <div class="bar2">
+      <label class="sub-lb" for="quizN">数量</label>
+      <input id="quizN" class="num" type="number" min="1" step="1" value="10"
+        title="这次抽多少个词" />
+      <select id="quizScope" class="sel" title="考核范围">
+        <option value="all">不限范围</option>
+        <option value="key">只考重点词</option>
+        <option value="nokey">不考重点词</option>
+      </select>
+    </div>
+    <div class="bar2">
+      <button id="btnQuizStart" class="btn" title="从生词本里随机抽词">随机抽题</button>
+      <button id="btnQuizReveal" class="btn" title="一键显示 / 收起全部释义">显示全部释义</button>
+      <span class="sp"></span>
+      <span id="quizCount" class="muted">—</span>
+    </div>
+    <div id="quizList" class="list"></div>
+  </section>
+
+  <!-- ============ 设置 ============ -->
+  <section class="page" data-page="set">
+    <div class="pad">
+      <label class="lb">翻译目标语言</label>
+      <select id="trTarget" class="sel full">
+        <option value="zh-CN">中文（简体）</option>
+        <option value="zh-TW">中文（繁体）</option>
+        <option value="ja">日语</option>
+        <option value="ko">韩语</option>
+        <option value="fr">法语</option>
+        <option value="de">德语</option>
+        <option value="es">西班牙语</option>
+        <option value="ru">俄语</option>
+      </select>
+
+      <label class="lb">链接跳转</label>
+      <select id="linkNav" class="sel full">
+        <option value="smart">智能：标题可点，正文链接只查词（默认）</option>
+        <option value="block">全部阻止：任何链接都不跳转</option>
+        <option value="allow">全部允许：保持浏览器原生行为</option>
+      </select>
+      <div class="muted sm hint" style="margin:-4px 0 10px">临时想跳转时按住 Alt 点；网页右下角 R 左边的 智 / ⊘ / ↗ 也能一键切换</div>
+
+      <label class="lb">翻译引擎</label>
+      <select id="trProvider" class="sel full">
+        <option value="auto">自动（Google 优先，失败切 MyMemory）</option>
+        <option value="google">Google 翻译（质量最好，需能访问外网）</option>
+        <option value="mymemory">MyMemory（国内可直连，有每日额度）</option>
+      </select>
+
+      <label class="lb">MyMemory 邮箱（可选）</label>
+      <input id="mmEmail" class="inp full" type="email" placeholder="填了额度从 5000 → 50000 字符/天" />
+      <div class="muted sm hint" style="margin:-4px 0 10px">只用于向 MyMemory 申请更高免费额度，不会上传到别处。译文会缓存在本地，重复拖选同一段不再请求。</div>
+      <button id="clearTrCache" class="btn" style="margin-bottom:10px">清除翻译缓存</button>
+
+      <label class="lb">主题</label>
+      <select id="themeSelect" class="sel full">
+        <option value="light">☀️ 白天</option>
+        <option value="dark">🌙 黑夜</option>
+        <option value="cyberpunk">⚡ 赛博朋克</option>
+        <option value="minimal">◻ 极简主义</option>
+      </select>
+
+      <label class="lb">语言</label>
+      <select id="langSelect" class="sel full">
+        <option value="zh">简体中文</option>
+        <option value="en">English</option>
+      </select>
+
+      <label class="lb">界面字号 <b id="uiFontVal" class="v">12</b></label>
+      <input id="uiFont" type="range" min="10" max="20" step="1" value="12" />
+      <div class="muted sm hint" style="margin:-4px 0 10px">只调这些面板、按钮和列表的字号，不改网页正文</div>
+
+      <label class="lb">小字说明</label>
+      <div class="row">
+        <input id="hintsOn" type="checkbox" />
+        <span class="muted">显示功能旁的灰色说明文字（关掉后界面更清爽）</span>
+      </div>
+
+      <label class="lb">正文字体</label>
+      <select id="fontFamily" class="sel full">
+        <option value="default">系统默认</option>
+        <option value="sans">无衬线 Sans</option>
+        <option value="serif">衬线 Serif</option>
+        <option value="mono">等宽 Mono</option>
+        <option value="cjk">中文黑体</option>
+      </select>
+
+      <label class="lb">悬停收藏星标</label>
+      <div class="row">
+        <input id="starOn" type="checkbox" />
+        <span class="muted">鼠标悬停段落时在段落右侧显示 ☆，点击收藏该段</span>
+      </div>
+
+      <label class="lb">释义浮层位置</label>
+      <div class="row">
+        <input id="popAbove" type="checkbox" />
+        <span class="muted">释义显示在单词<b>上方</b>（离「加入生词本」更近）；关闭则显示在下方</span>
+      </div>
+
+      <hr />
+      <div class="muted sm hint" id="helpTip">
+        用法：<b>单击</b>查词 · <b>双击</b>加入生词本 · <b>拖选词组</b>词组翻译 · <b>拖选句子</b>句子翻译 · 悬停段落出现 <b>☆</b> 收藏。
+      </div>
+
+      <hr />
+      <label class="lb">词典数据来源</label>
+      <div class="muted sm">
+        内置词典基于开源项目 <b>ECDICT</b> 整理（<a href="https://github.com/skywind3000/ECDICT" target="_blank" rel="noopener">github.com/skywind3000/ECDICT</a>），
+        采用 <b>MIT License</b>，Copyright (c) 2025 Linwei。<br />
+        本站仅保留新闻阅读常用的短释义；<b>[医] [计] [化]</b> 等方括号标注表示该义项所属的专业领域。
+      </div>
+    </div>
+  </section>
+
+  <script src="panel.js"></script>
+</body>
+</html>

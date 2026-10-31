@@ -1,0 +1,349 @@
+/* panel.css —— 侧边栏 / 图标弹窗的样式（与 content.css 共用同一套主题变量） */
+
+/* 主题变量定义在 :root（=html）上，这样 body 之外的留白也能跟随，
+   否则黑夜主题下侧边栏右侧会露出一条刺眼的白边。 */
+:root {
+  --bg: #ffffff; --fg: #1b2333; --mut: #64748b; --bd: #e2e8f0;
+  --ac: #2d5bd7; --ac-fg: #ffffff; --card: #f8fafc; --danger: #d33;
+  /* 界面字号缩放系数，由 panel.js 按设置写入；1 = 原来的观感 */
+  --ui-scale: 1;
+  color-scheme: light;
+}
+:root[data-wk-theme="dark"] {
+  --bg: #151a24; --fg: #e6edf7; --mut: #93a1b5; --bd: #2b3444;
+  --ac: #6f9bff; --ac-fg: #0b1017; --card: #1b2130; --danger: #ff7a7a;
+  color-scheme: dark;
+}
+:root[data-wk-theme="cyberpunk"] {
+  --bg: #14021e; --fg: #f2e9ff; --mut: #b06ad6; --bd: #57237a;
+  --ac: #ff2e88; --ac-fg: #14021e; --card: #1d0529; --danger: #ff5c5c;
+  color-scheme: dark;
+}
+:root[data-wk-theme="minimal"] {
+  --bg: #ffffff; --fg: #111111; --mut: #767676; --bd: #e8e8e8;
+  --ac: #111111; --ac-fg: #ffffff; --card: #fafafa; --danger: #c00;
+  color-scheme: light;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0; padding: 0;
+  background: var(--bg); color: var(--fg);
+  /* 原来是一行 font 简写；拆开是为了让字号能跟着「界面字号」缩放。
+     字号写成 calc 而不是用 zoom，面板宽度（360px）保持不变，
+     字变大只是换行更多，不会把窗口撑出去。 */
+  font-family: -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif;
+  font-size: calc(13px * var(--ui-scale, 1));
+  line-height: 1.55;
+}
+/* body 固定 360px（侧边栏宽度）；图标弹窗里 Chrome 会把它居中，
+   所以 html 也要跟着主题色，否则两侧留白在黑夜主题下是刺眼的白。 */
+html { background: var(--bg); }
+body { width: 360px; min-height: 100vh; }
+
+.muted { color: var(--mut); }
+.sm { font-size: calc(11px * var(--ui-scale, 1)); }
+.sp { flex: 1; }
+
+/* ---------- 顶栏 ---------- */
+.hd {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 8px; padding: 10px 12px; border-bottom: 1px solid var(--bd);
+  position: sticky; top: 0; background: var(--bg); z-index: 5;
+}
+.hd-l { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
+.logo { font-size: calc(15px * var(--ui-scale, 1)); }
+.dict-note { font-size: calc(10px * var(--ui-scale, 1)); color: var(--mut); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+.pill {
+  padding: 4px 10px; border: 1px solid var(--bd); border-radius: 999px;
+  background: transparent; color: var(--mut); font: inherit; font-size: calc(11px * var(--ui-scale, 1)); cursor: pointer;
+  white-space: nowrap;
+}
+.pill.on { background: var(--ac); border-color: var(--ac); color: var(--ac-fg); }
+
+/* ---------- 标签页 ---------- */
+.tabs { display: flex; border-bottom: 1px solid var(--bd); position: sticky; top: 45px; background: var(--bg); z-index: 4; }
+.tab {
+  flex: 1; padding: 8px 4px; border: 0; border-bottom: 2px solid transparent;
+  background: transparent; color: var(--mut); font: inherit; font-size: calc(12px * var(--ui-scale, 1)); cursor: pointer;
+}
+.tab.active { color: var(--ac); border-bottom-color: var(--ac); font-weight: 600; }
+
+.page { display: none; }
+.page.active { display: block; }
+
+/* ---------- 工具条 ---------- */
+.bar { display: flex; gap: 6px; padding: 8px 12px 4px; }
+.bar2 { display: flex; align-items: center; gap: 6px; padding: 0 12px 8px; flex-wrap: wrap; }
+
+.inp {
+  flex: 1; min-width: 0; padding: 6px 9px;
+  border: 1px solid var(--bd); border-radius: 7px;
+  background: var(--card); color: var(--fg); font: inherit; font-size: calc(12px * var(--ui-scale, 1));
+}
+.inp:focus, .ta:focus, .sel:focus { outline: 2px solid color-mix(in srgb, var(--ac) 45%, transparent); outline-offset: -1px; }
+.inp.full { width: 100%; margin-bottom: 10px; }
+
+.sel {
+  padding: 5px 7px; border: 1px solid var(--bd); border-radius: 7px;
+  background: var(--card); color: var(--fg); font: inherit; font-size: calc(12px * var(--ui-scale, 1));
+}
+.sel.full { width: 100%; margin-bottom: 10px; }
+
+.btn {
+  padding: 4px 9px; border: 1px solid var(--bd); border-radius: 7px;
+  background: transparent; color: var(--fg); font: inherit; font-size: calc(11px * var(--ui-scale, 1)); cursor: pointer;
+}
+.btn:hover { border-color: var(--ac); color: var(--ac); }
+.btn.danger:hover { border-color: var(--danger); color: var(--danger); }
+
+/* ---------- 列表 ---------- */
+.list { padding: 0 12px 16px; }
+
+.item {
+  padding: 8px 10px; margin-bottom: 6px;
+  border: 1px solid var(--bd); border-left: 3px solid var(--ac); border-radius: 8px;
+  background: var(--card);
+}
+.item.dup { border-left-color: var(--danger); }
+.item .w { font-size: calc(14px * var(--ui-scale, 1)); font-weight: 700; color: var(--ac); word-break: break-word; }
+.item .d { font-size: calc(11px * var(--ui-scale, 1)); color: var(--fg); opacity: .92; margin-top: 2px; word-break: break-word; }
+.item .m { font-size: calc(10px * var(--ui-scale, 1)); color: var(--mut); margin-top: 4px; display: flex; gap: 8px; align-items: center; }
+.item .m .x { margin-left: auto; cursor: pointer; color: var(--mut); }
+.item .m .x:hover { color: var(--danger); }
+.item mark { background: color-mix(in srgb, var(--ac) 28%, transparent); color: inherit; border-radius: 3px; }
+
+.empty { padding: 26px 12px; text-align: center; color: var(--mut); font-size: calc(12px * var(--ui-scale, 1)); }
+
+/* 小字说明：设置里可以关掉。功能旁的灰色解释、空列表里的补充说明都归它管，
+   主提示（"还没有生词。"这类）留着，否则空列表会变成一片空白。 */
+.hint { font-size: calc(10.5px * var(--ui-scale, 1)); line-height: 1.6; color: var(--mut); }
+body.no-hints .hint { display: none !important; }
+
+/* ---------- 生词本「按重点」分区 ---------- */
+/* 区头：把"非重点区"与"重点区"分开。重点区用红字呼应网页上的红色虚线。 */
+.group-hd {
+  display: flex; align-items: center; gap: 8px;
+  margin: 12px 0 6px; padding-bottom: 4px;
+  border-bottom: 1px solid var(--bd);
+  font-size: calc(11px * var(--ui-scale, 1)); font-weight: 700; color: var(--mut);
+  letter-spacing: .04em;
+}
+.group-hd:first-child { margin-top: 2px; }
+.group-hd .gn { margin-left: auto; font-weight: 400; font-size: calc(10px * var(--ui-scale, 1)); }
+.group-hd.key { color: #d93025; border-bottom-color: color-mix(in srgb, #d93025 40%, transparent); }
+
+.group-empty { padding: 10px 2px; color: var(--mut); font-size: calc(11px * var(--ui-scale, 1)); }
+
+/* ★ 重点区的词一律红字（与侧边栏 .wk-item-key .w 保持同一种红） */
+.item.is-key .w { color: #d93025; font-weight: 700; }
+.item.is-key { border-left-color: #d93025; }
+
+.sub-lb { font-size: calc(11px * var(--ui-scale, 1)); color: var(--mut); white-space: nowrap; }
+
+/* 重点切换星标 */
+.item .m .starbtn {
+  margin-left: auto; cursor: pointer; color: var(--mut);
+  font-size: calc(12px * var(--ui-scale, 1)); user-select: none;
+}
+.item .m .starbtn:hover, .item .m .starbtn.on { color: #d93025; }
+.item .m .starbtn.on { font-weight: 700; }
+/* 星标吃 margin-left:auto；紧随其后的删除键不再抢这个自动外边距 */
+.item .m .starbtn ~ .x { margin-left: 0; }
+
+/* ---------- 仓库条目 ---------- */
+.item .txt { font-size: calc(12px * var(--ui-scale, 1)); white-space: pre-wrap; word-break: break-word; max-height: 7em; overflow: auto; }
+
+/* 全文条目：默认折叠在一个小框里，展开后铺开全文。
+   之前只有 max-height:7em + overflow:auto —— 内容其实没丢，
+   但那是个**没有提示的滚动框**，用户只会以为"收藏时只存了开头"，
+   所以必须给一个显眼的「展开全文」。 */
+.item.long .txt { max-height: 5.5em; }
+.item.long.open .txt { max-height: none; overflow: visible; }
+.item .more {
+  display: block;
+  width: 100%;
+  margin-top: 6px;
+  padding: 5px 8px;
+  border: 1px solid color-mix(in srgb, var(--ac) 40%, transparent);
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--ac) 8%, transparent);
+  color: var(--ac);
+  font-size: calc(11px * var(--ui-scale, 1));
+  font-weight: 600;
+  cursor: pointer;
+}
+.item .more:hover { background: color-mix(in srgb, var(--ac) 16%, transparent); }
+.kind {
+  display: inline-block; padding: 1px 5px; border-radius: 4px;
+  background: color-mix(in srgb, var(--ac) 16%, transparent);
+  color: var(--ac); font-size: calc(10px * var(--ui-scale, 1)); font-weight: 600;
+}
+
+/* 链接收藏：标题可点击、网址弱化、时间灰显、重命名内联输入框 */
+.item.link { border-left-color: var(--ac); }.item.link a.lk { display: block; color: var(--ac); font-weight: 600; text-decoration: none; word-break: break-all; }
+.item.link a.lk:hover { text-decoration: underline; }
+.item.link .lk-url { color: var(--mut); font-size: calc(10px * var(--ui-scale, 1)); word-break: break-all; margin-top: 2px; }
+.item.link .tm { color: var(--mut); font-size: calc(10px * var(--ui-scale, 1)); }
+.item.link .m .x { color: var(--mut); cursor: pointer; }
+.item.link .m .x:hover { color: var(--ac); }
+.item.link .m .x[data-a="rename"] { color: var(--mut); }
+.item.link .m .x[data-a="rename"]:hover { color: var(--ac); }
+
+/* ---------- 笔记块 ----------
+   两处共用：仓库条目下方的笔记、笔记模块里的独立笔记卡片。
+   左侧竖线用主色，和收藏内容区分开。 */
+.item .m .x ~ .x { margin-left: 0; }
+
+.note {
+  margin-top: 6px;
+  padding: 5px 8px;
+  background: color-mix(in srgb, var(--ac) 7%, var(--bg));
+  border-left: 2px solid var(--ac);
+  cursor: text;                 /* 整块都可点，点了就进编辑 */
+}
+.note:hover .note-lb { filter: brightness(1.15); }
+
+/* 笔记模块里的卡片之间留一点缝，别糊成一片 */
+#noteList .note { margin-bottom: 8px; }
+/* 标题行是信息行，不再是整行折叠开关（点卡片任意处进编辑） */
+.note-hd {
+  display: flex; align-items: center; gap: 6px;
+  margin-bottom: 2px;
+  font-size: calc(10px * var(--ui-scale, 1));
+  color: var(--mut);
+  user-select: none;
+}
+/* 折叠箭头：唯一负责展开 / 收起的控件，给它一块够大的点击区 */
+.note-ar {
+  color: var(--ac); font-size: calc(11px * var(--ui-scale, 1)); line-height: 1;
+  width: 15px; margin-left: -4px; margin-right: -2px; padding: 3px 0;
+  text-align: center; flex: 0 0 auto;
+  cursor: pointer; border-radius: 3px;
+}
+.note-ar:hover { background: color-mix(in srgb, var(--ac) 14%, transparent); }
+/* 标题可能是用户自写的，长标题要能截断，否则会把创建时间挤出去 */
+.note-lb {
+  font-weight: 700; color: var(--ac); letter-spacing: .04em;
+  flex: 0 1 auto; min-width: 0;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.note-lb:not(.titled) { color: var(--mut); letter-spacing: 0; }
+.note-hint { margin-left: auto; flex: 0 0 auto; }
+.note-tm {
+  color: var(--mut);
+  font-size: calc(9px * var(--ui-scale, 1));
+  flex: 0 0 auto; white-space: nowrap;
+}
+.note-x { cursor: pointer; color: var(--mut); flex: 0 0 auto; }
+.note-x:hover { color: var(--ac); }
+
+/* 标题输入框：贴在正文框上方，同一套边框语言，只是更矮 */
+.note-ti {
+  display: block; width: 100%;
+  margin-bottom: 4px; padding: 4px 8px;
+  border: 1px solid var(--bd); border-radius: 6px;
+  background: var(--bg); color: var(--fg);
+  font: inherit; font-size: calc(12px * var(--ui-scale, 1)); font-weight: 700;
+}
+.note-ti:focus { outline: 2px solid color-mix(in srgb, var(--ac) 45%, transparent); outline-offset: -1px; }
+.note-ti::placeholder { color: var(--mut); font-weight: 400; }
+
+.note-ph { color: var(--mut); }
+/* 收起态一行预览，展开态全文；编辑时都让位给输入框 */
+.note-pv {
+  font-size: calc(11px * var(--ui-scale, 1));
+  line-height: 1.55;
+  color: var(--mut);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  cursor: text;
+}
+.note-txt {
+  display: none;
+  font-size: calc(11px * var(--ui-scale, 1));
+  line-height: 1.6;
+  color: var(--fg);
+  white-space: pre-wrap;
+  word-break: break-word;
+  cursor: text;
+}
+.note.open .note-txt { display: block; }
+.note.open .note-pv { display: none; }
+.note.editing .note-txt,
+.note.editing .note-pv { display: none; }
+.note-ta {
+  display: block; width: 100%; min-height: 54px;
+  padding: 6px 8px;
+  border: 1px solid var(--ac); border-radius: 6px;
+  background: var(--bg); color: var(--fg);
+  font: inherit; font-size: calc(11px * var(--ui-scale, 1)); line-height: 1.6;
+  resize: vertical;
+}
+
+/* ---------- 随机测试 ----------
+   抽出来的词排成一列，默认盖住释义；点行看释义，右侧管重点 / 移出。 */
+.num {
+  width: 54px; height: 26px;
+  padding: 0 6px;
+  background: var(--bg); border: 1px solid var(--bd); border-radius: 6px;
+  color: var(--fg); font-family: inherit;
+  font-size: calc(11px * var(--ui-scale, 1));
+  text-align: center;
+}
+.num:focus { outline: none; border-color: var(--ac); }
+
+.qrow {
+  display: flex; align-items: flex-start; gap: 8px;
+  padding: 7px 12px;
+  border-bottom: 1px solid var(--bd);
+  cursor: pointer;
+}
+.qrow:hover { background: color-mix(in srgb, var(--ac) 5%, transparent); }
+.qrow.key .qz-w { color: #d93025; }
+
+.qz-no {
+  flex: 0 0 auto; width: 16px; text-align: right;
+  color: var(--mut); font-size: calc(10px * var(--ui-scale, 1)); line-height: 1.7;
+}
+.qz-body { flex: 1 1 auto; min-width: 0; }
+.qz-w {
+  font-size: calc(13px * var(--ui-scale, 1));
+  font-weight: 600; color: var(--fg); word-break: break-word;
+}
+.qz-lemma {
+  margin-left: 6px; font-weight: 400;
+  font-size: calc(10px * var(--ui-scale, 1)); color: var(--mut);
+}
+.qz-def {
+  margin-top: 2px;
+  font-size: calc(11px * var(--ui-scale, 1));
+  line-height: 1.55; color: var(--mut); word-break: break-word;
+}
+/* 显示释义后从灰变亮，一眼看出这行已经翻过面 */
+.qrow.on .qz-def { color: var(--fg); }
+.qz-hide { color: var(--mut); }
+.qz-none { color: var(--mut); font-style: italic; }
+
+.qz-act {
+  flex: 0 0 auto; display: flex; align-items: center; gap: 8px;
+  color: var(--mut); font-size: calc(10px * var(--ui-scale, 1));
+}
+.qrow .starbtn { cursor: pointer; font-size: calc(13px * var(--ui-scale, 1)); line-height: 1; }
+.qrow .starbtn:hover, .qrow .starbtn.on { color: #d93025; }
+.qz-act .x { cursor: pointer; }
+.qz-act .x:hover { color: var(--ac); }
+
+/* ---------- 设置 ---------- */
+.pad { padding: 10px 12px 20px; }
+.lb { display: block; margin: 10px 0 5px; font-size: calc(11px * var(--ui-scale, 1)); color: var(--mut); }
+.lb .v { color: var(--ac); font-size: calc(12px * var(--ui-scale, 1)); }
+input[type="range"] { width: 100%; margin-bottom: 8px; accent-color: var(--ac); }
+.row { display: flex; align-items: center; gap: 7px; }
+.row input[type="checkbox"] { width: 15px; height: 15px; accent-color: var(--ac); }
+.ta {
+  width: 100%; padding: 8px; border: 1px solid var(--bd); border-radius: 8px;
+  background: var(--card); color: var(--fg); font: inherit; font-size: calc(12px * var(--ui-scale, 1)); resize: vertical;
+}
+hr { margin: 14px 0; border: 0; border-top: 1px solid var(--bd); }

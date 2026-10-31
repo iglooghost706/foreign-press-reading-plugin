@@ -1,0 +1,407 @@
+/* content.css —— 注入网页的样式。
+ *
+ * 设计原则：**尽量不打扰原网页**。
+ *   · 不用全屏遮罩、不改原页面布局，只在点上词时冒出一个小浮层
+ *   · 生词本里的词用虚线下划线（与原网页链接样式区分）
+ *   · 所有颜色走 CSS 变量，跟随插件面板里选的 4 套主题
+ *   · wk-off 时全部隐藏（用户在浮动按钮上一键关掉）
+ */
+
+:root {
+  /* 正文字体：只在用户选了具体字族时由 content.js 写入，初值 inherit 表示不接管 */
+  --wk-ff: inherit;
+
+  /* 白天 */
+  --wk-bg: #ffffff;
+  --wk-fg: #1b2333;
+  --wk-mut: #64748b;
+  --wk-bd: #d8dee9;
+  --wk-ac: #2d5bd7;
+  --wk-ac-fg: #ffffff;
+  --wk-sh: 0 8px 28px rgba(15, 23, 42, .18);
+}
+
+/* 黑夜 */
+[data-wk-theme="dark"] {
+  --wk-bg: #151a24;
+  --wk-fg: #e6edf7;
+  --wk-mut: #93a1b5;
+  --wk-bd: #2b3444;
+  --wk-ac: #6f9bff;
+  --wk-ac-fg: #0b1017;
+  --wk-sh: 0 8px 28px rgba(0, 0, 0, .55);
+}
+
+/* 赛博朋克 */
+[data-wk-theme="cyberpunk"] {
+  --wk-bg: #14021e;
+  --wk-fg: #f2e9ff;
+  --wk-mut: #b06ad6;
+  --wk-bd: #57237a;
+  --wk-ac: #ff2e88;
+  --wk-ac-fg: #14021e;
+  --wk-sh: 0 0 0 1px rgba(255, 46, 136, .55), 0 8px 30px rgba(255, 46, 136, .28);
+}
+
+/* 极简主义 */
+[data-wk-theme="minimal"] {
+  --wk-bg: #ffffff;
+  --wk-fg: #111111;
+  --wk-mut: #767676;
+  --wk-bd: #e2e2e2;
+  --wk-ac: #111111;
+  --wk-ac-fg: #ffffff;
+  --wk-sh: 0 2px 10px rgba(0, 0, 0, .10);
+}
+
+/* ---------- 关闭态：整体隐身 ---------- */
+:root.wk-off .wk-pop,
+:root.wk-off .wk-star,
+:root.wk-off .wk-link-fab,
+:root.wk-off .wk-toast,
+/* 重点词（.wk-key）只是 .wk-banked 的修饰类，本身不产生盒子，
+   靠上面的 .wk-banked 一并隐藏即可，无需单独列。 */
+:root.wk-off .wk-banked {
+  display: none !important;
+}
+
+/* ---------- 释义浮层 ---------- */
+.wk-pop {
+  position: absolute;
+  z-index: 2147483000;
+  box-sizing: border-box;
+  width: 300px;
+  max-width: 78vw;
+  max-height: 46vh;
+  overflow: auto;
+  padding: 10px 12px;
+  background: var(--wk-bg);
+  color: var(--wk-fg);
+  border: 1px solid var(--wk-bd);
+  border-radius: 10px;
+  box-shadow: var(--wk-sh);
+  font: 13px/1.6 var(--wk-ff), -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif;
+}
+.wk-pop-wide { width: 340px; }
+
+.wk-pop-title {
+  font-size: 15px;
+  font-weight: 700;
+  margin-bottom: 5px;
+  color: var(--wk-ac);
+  word-break: break-word;
+}
+.wk-src {
+  display: inline-block;
+  vertical-align: 2px;
+  margin-left: 4px;
+  padding: 1px 5px;
+  border-radius: 5px;
+  background: color-mix(in srgb, var(--wk-ac) 14%, transparent);
+  color: var(--wk-ac);
+  font-size: 10px;
+  font-weight: 600;
+}
+.wk-def { color: var(--wk-fg); word-break: break-word; }
+.wk-def.wk-def-err { color: #b3261e; font-size: 12px; }
+.wk-def .wk-pos { color: var(--wk-ac); font-weight: 600; }
+.wk-def .wk-dom {
+  font-style: normal;
+  font-size: 10px;
+  padding: 0 3px;
+  margin: 0 1px;
+  border-radius: 3px;
+  vertical-align: 1px;
+  color: var(--wk-mut);
+  background: rgba(128, 128, 128, 0.16);
+}
+.wk-lemmat { margin-top: 5px; color: var(--wk-mut); font-size: 11px; }
+.wk-lemmat b { color: var(--wk-fg); }
+.wk-src-text {
+  margin: 4px 0 6px;
+  padding: 5px 7px;
+  border-left: 3px solid var(--wk-bd);
+  background: color-mix(in srgb, var(--wk-mut) 9%, transparent);
+  color: var(--wk-mut);
+  font-size: 12px;
+  font-style: italic;
+  word-break: break-word;
+}
+.wk-muted { color: var(--wk-mut); }
+.wk-loading { color: var(--wk-mut); font-size: 12px; }
+
+.wk-acts { display: flex; gap: 6px; margin-top: 9px; flex-wrap: wrap; }
+.wk-btn {
+  flex: 1 1 auto;
+  min-width: 78px;
+  padding: 5px 9px;
+  border: 1px solid var(--wk-bd);
+  border-radius: 7px;
+  background: transparent;
+  color: var(--wk-fg);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+.wk-btn:hover { border-color: var(--wk-ac); color: var(--wk-ac); }
+.wk-btn.wk-on { background: var(--wk-ac); border-color: var(--wk-ac); color: var(--wk-ac-fg); }
+.wk-btn.wk-flash { background: var(--wk-ac); border-color: var(--wk-ac); color: var(--wk-ac-fg); }
+
+/* ---------- 生词本标记：所有词形都划线 ---------- */
+.wk-banked {
+  border-bottom: 2px dotted #2d5bd7;
+  cursor: help;
+}
+
+/* ---------- 重点词语：红色虚线，比普通生词更醒目 ---------- */
+.wk-banked.wk-key {
+  border-bottom-color: #d93025;
+  font-weight: 600;
+  background: rgba(217, 48, 37, .07);
+}
+
+/* 重点标记按钮所在的第二行：和移除按钮分开，避免误点 */
+.wk-acts-2 { margin-top: 6px; padding-top: 6px; border-top: 1px solid var(--wk-line, rgba(128,128,128,.22)); }
+
+.wk-key-btn { width: 100%; text-align: center; }
+.wk-key-btn.wk-key-on {
+  background: #d93025;
+  border-color: #d93025;
+  color: #fff;
+  font-weight: 700;
+}
+.wk-key-btn.wk-key-on:hover { background: #b3251c; border-color: #b3251c; }
+
+/* ---------- 推销气泡的持久压制 ----------
+   DOM 藏掉只是暂时生效：站点的脚本可能在 mouseleave / 重新渲染时
+   把同一个 tooltip 再挂出来（Al Jazeera 实测会）。
+   用 [data-wk-pitch] 属性 + CSS 把重建出来的同类气泡一起按下去。
+   选择器覆盖常见的 tooltip / popover 命名，只在带我们标记时生效。 */
+[data-wk-pitch="hidden"],
+[data-wk-pitch="closed"],
+.tooltip[data-wk-pitch],
+[class*="tooltip" i][data-wk-pitch],
+[class*="popover" i][data-wk-pitch],
+[class*="signup" i][data-wk-pitch] {
+  display: none !important;
+}
+
+/* ★★ 悬停不再让位、也不再重排。
+   曾经的方案是给段落加 padding-right:34px 给星标腾位置，
+   结果**正文重排、整页往下顶**，用户反馈"看着很难受"。
+   实测（tools/probe-star-fit.js，真实文章页 2 站 × 3 视口宽）：
+     · 段落右侧到视口右缘的空隙 ≥34px 的比例 = **100%**
+     · 但那处空隙"确实没人占"的比例只有 0–25%（BBC 是 CSS Grid 分栏，
+       段落右边紧邻隔壁栏；Guardian 是卡片 + 视频 iframe）
+   所以正确做法是**零重排**：星标一律绝对定位、不碰段落盒模型，
+   位置由 JS 实测决定，分两档：
+     .wk-star        → 落在段落**右侧外部**的空隙里（首选，不压字）
+     .wk-star-inside → 放不下时才贴回段落**内部**右上角（退路）
+   两档都不修改段落尺寸，正文永远不重排。 */
+.wk-star {
+  position: absolute;
+  /* 首选位：段落右侧外部。JS 会覆写 top/right（实测坐标）。 */
+  z-index: 2147482000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 2px solid var(--wk-ac);
+  border-radius: 50%;
+  background: var(--wk-bg);
+  color: var(--wk-ac);
+  font-size: 18px;
+  line-height: 1;
+  font-weight: 700;
+  cursor: pointer;
+  opacity: .95;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, .18);
+  transition: opacity .12s, transform .12s, box-shadow .12s;
+}
+
+/* ★ 退路档：右侧被占 / 放出去会被裁掉时，贴回段落内部右上角。
+   此时必须半透明 + 悬停才实心，否则会盖住第一行末尾的字。 */
+.wk-star-inside {
+  top: 0 !important;
+  right: 0 !important;
+  opacity: .55;
+  background: var(--wk-bg);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, .14);
+}
+.wk-star-inside:hover { opacity: 1; }
+
+.wk-star:hover {
+  opacity: 1;
+  transform: scale(1.15);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, .28);
+}
+.wk-star:focus-visible { outline: 2px solid var(--wk-ac); outline-offset: 2px; }
+/* ★ 标题（h1/h2/h3）也要定位上下文。
+     attachStar 挂在 p, blockquote, h1, h2, h3, li 上，
+     但这里原来只写了 p, blockquote, li —— 标题是 position:static，
+     星标就以最近的定位祖先（body/html）为准，统统跑到页面右上角叠在一起。 */
+p, blockquote, li, h1, h2, h3, h4, h5, h6 {
+  position: relative;
+}
+
+/* ---------- 右下角工具坞 ----------
+   四个按钮收进同一条胶囊里：模式 · 星标 · 网址 · 电源。
+   之前是四个各自 fixed 的圆钮，间距靠手写 right 值（14 / 58 / 102，外加一个 58px 高的）
+   堆出来 —— 既不对齐，四个同样重的蓝圆也在抢注意力。
+   现在统一成一条淡色工具坞：默认只有淡图标，悬停才浮出色块，
+   电源是唯一的实心块，靠它一眼判断"功能在用/已停"。配色跟随主题变量。 */
+.wk-dock {
+  position: fixed;
+  right: 14px;
+  bottom: 14px;
+  z-index: 2147482500;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 4px;
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--wk-bg) 88%, transparent);
+  border: 1px solid color-mix(in srgb, var(--wk-bd) 85%, transparent);
+  box-shadow: 0 8px 24px -10px rgba(15, 23, 42, .45), 0 2px 6px rgba(15, 23, 42, .08);
+  -webkit-backdrop-filter: blur(12px) saturate(1.5);
+  backdrop-filter: blur(12px) saturate(1.5);
+  font-family: system-ui, -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif;
+  opacity: .95;
+  transition: opacity .16s ease, box-shadow .16s ease;
+}
+.wk-dock:hover {
+  opacity: 1;
+  box-shadow: 0 10px 30px -10px rgba(15, 23, 42, .55), 0 2px 8px rgba(15, 23, 42, .10);
+}
+
+/* 按钮本体：默认幽灵图标，悬停才出色块 */
+.wk-dock > button {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--wk-mut);
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: .2px;
+  cursor: pointer;
+  -webkit-appearance: none;
+  appearance: none;
+  transition: background .14s ease, color .14s ease, transform .1s ease;
+}
+.wk-dock > button:hover {
+  background: color-mix(in srgb, var(--wk-ac) 14%, transparent);
+  color: var(--wk-ac);
+}
+.wk-dock > button:active { transform: scale(.92); }
+.wk-dock > button:focus-visible { outline: 2px solid var(--wk-ac); outline-offset: 1px; }
+.wk-dock > button svg { width: 16px; height: 16px; display: block; }
+
+/* 排列顺序：模式 → 星标 → 网址 → 电源（电源贴着右下角，最顺手） */
+.wk-dock .wk-nav-fab  { order: 1; }
+.wk-dock .wk-star-fab { order: 2; }
+.wk-dock .wk-link-fab { order: 3; }
+.wk-dock .wk-fab      { order: 4; }
+
+/* 链接跳转：智 / ⊘ / ↗ —— 智能与允许用强调色，阻止用灰色（"收着"的状态） */
+.wk-dock .wk-nav-fab { color: var(--wk-ac); }
+.wk-dock .wk-nav-fab.wk-nav-word { font-size: 9px; letter-spacing: .3px; }
+.wk-dock .wk-nav-fab.wk-nav-block { color: var(--wk-mut); font-size: 14px; }
+.wk-dock .wk-nav-fab.wk-nav-on { font-size: 14px; }
+
+/* 段落星标：开启=实心强调色，关闭=空心灰 */
+.wk-dock .wk-star-fab { color: var(--wk-ac); }
+.wk-dock .wk-star-fab svg path { fill: currentColor; }
+.wk-dock .wk-star-fab.wk-star-off { color: var(--wk-mut); }
+.wk-dock .wk-star-fab.wk-star-off svg path { fill: none; }
+
+/* 收藏网址 */
+.wk-dock .wk-link-fab:hover { color: var(--wk-ac); }
+
+/* 电源：开启时是工具坞里唯一的实心块 */
+.wk-dock .wk-fab {
+  margin-left: 7px;
+  background: var(--wk-ac);
+  color: var(--wk-ac-fg);
+  font-size: 11px;
+  letter-spacing: .4px;
+}
+.wk-dock .wk-fab::before {
+  content: '';
+  position: absolute;
+  left: -5px;
+  top: 50%;
+  width: 1px;
+  height: 16px;
+  transform: translateY(-50%);
+  background: color-mix(in srgb, var(--wk-bd) 90%, transparent);
+  pointer-events: none;
+}
+.wk-dock .wk-fab:hover { background: var(--wk-ac); color: var(--wk-ac-fg); filter: brightness(1.08); }
+.wk-dock .wk-fab.wk-off {
+  margin-left: 0;
+  background: transparent;
+  color: var(--wk-mut);
+  filter: none;
+}
+.wk-dock .wk-fab.wk-off::before { display: none; }
+/* 状态类（block / star-off）的优先级高于通用 :hover，
+   这里补回悬停高亮，避免"灰着的按钮鼠标移上去没反应" */
+.wk-dock .wk-nav-fab.wk-nav-block:hover { color: var(--wk-ac); }
+.wk-dock .wk-star-fab.wk-star-off:hover { color: var(--wk-ac); }
+
+.wk-dock .wk-fab.wk-off:hover {
+  background: color-mix(in srgb, var(--wk-ac) 14%, transparent);
+  color: var(--wk-ac);
+}
+
+/* 总开关关闭时，工具坞只留电源按钮 */
+:root.wk-off .wk-dock .wk-nav-fab,
+:root.wk-off .wk-dock .wk-star-fab,
+:root.wk-off .wk-dock .wk-link-fab { display: none !important; }
+
+/* ---------- toast ---------- */
+.wk-toast {
+  position: fixed;
+  left: 50%;
+  bottom: 26px;
+  transform: translate(-50%, 14px);
+  z-index: 2147483200;
+  max-width: 74vw;
+  padding: 8px 15px;
+  border-radius: 9px;
+  background: var(--wk-fg);
+  color: var(--wk-bg);
+  box-shadow: var(--wk-sh);
+  font: 13px/1.4 var(--wk-ff), system-ui, "Microsoft YaHei", sans-serif;
+  text-align: center;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity .18s ease, transform .18s ease;
+}
+.wk-toast.wk-show { opacity: 1; transform: translate(-50%, 0); }
+
+/* ---------- 阅读偏好：正文字体 ----------
+   字号和行距不再接管正文（设置里已经去掉了）：
+     · 字号现在调的是侧边栏界面，见 reader-sidebar.js 的 applyUiScale；
+     · 行距交回站点自己，强行 !important 覆盖反而破坏人家的版式。
+   这里只留「正文字体」，而且只在用户选了具体字族时才接管 —— 默认档必须
+   保留站点字体，否则把 --wk-ff 的初值 inherit 硬压下去会把站点字体洗掉。
+   作用范围只认 [data-wk-read]，由 content.js 的 pickArticleRoot() 运行时判定。 */
+:root.wk-ff-custom [data-wk-read]
+  :is(p, li, dd, dt, blockquote, figcaption, td, th, h1, h2, h3, h4, h5, h6) {
+  font-family: var(--wk-ff) !important;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-wk-theme]) { }
+}

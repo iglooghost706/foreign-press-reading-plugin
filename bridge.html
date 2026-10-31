@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<title>桥接页</title>
+<style>
+  body { font: 12px/1.6 "Microsoft YaHei", sans-serif; padding: 10px; color: #111; }
+  b { font-size: 13px; }
+  .muted { color: #666; }
+  code { background: #f2f2f2; padding: 1px 4px; }
+</style>
+</head>
+<body>
+  <b>外刊阅读 · 桥接页</b>
+  <div class="muted">这个页面只做一件事：把扩展的 chrome.storage 数据交给主进程，
+    让侧边栏能够显示与修改生词本、仓库和阅读设置。它本身不面向用户。</div>
+  <div class="muted">桥接状态：<span id="st">就绪</span></div>
+
+  <script src="bridge.js"></script>
+</body>
+</html>
