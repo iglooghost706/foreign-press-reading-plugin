@@ -3,7 +3,7 @@
 在网页上直接读英文外刊：**单击查词、双击入生词本、拖选翻译、悬停收藏句子**。
 词典内置在扩展里，断网也能查词；只有长句/段落翻译需要联网。
 
-- 版本 `0.1.0` · Manifest V3 · 适用 Chrome / Edge（Chromium 内核）
+- 版本 `0.1.1` · Manifest V3 · 适用 Chrome / Edge（Chromium 内核）
 - 无账号、无服务器、无遥测：生词、笔记、设置全部存在本地 `chrome.storage.local`
 - 纯原生 JS，无构建步骤、无依赖：改完源码在扩展页点「重新加载」即生效
 
@@ -93,7 +93,7 @@
 1. 打开 `chrome://extensions/`
 2. 右上角打开 **开发者模式**
 3. 点 **加载已解压的扩展程序**，选择本目录（含 `manifest.json` 的那一层）
-4. 列表出现「外刊阅读 0.1.0」即安装完成；点扩展图标可打开面板
+4. 列表出现「外刊阅读 0.1.1」即安装完成；点扩展图标可打开面板
 
 > ⚠️ **Chrome 137 起，正式版已禁用命令行 `--load-extension` 加载扩展**，只能走上面的「加载已解压」。
 > 这也是为什么本插件不做自动安装脚本。
@@ -295,3 +295,29 @@ extension/
 仅保留新闻阅读常用的短释义。翻译由 Google 翻译（非官方 gtx 接口）与 MyMemory 提供，均为公开免费接口。
 
 本项目以 **MIT License** 发布，详见 [LICENSE](LICENSE)。
+
+---
+
+## 11. 更新日志
+
+### 0.1.1 — 非文章页兼容性修复
+
+上一版在 GitHub、微信公众号、各类 Web 应用页面上会白屏或界面失效。原因不是某个站点特例，而是内容脚本在**识别不出正文的页面**上仍然按「这是一篇文章」去改 DOM。本版把范围收窄到真正的正文容器，识别不出就一个节点都不碰。
+
+| 问题 | 原因 | 修复 |
+| --- | --- | --- |
+| 巨型 DOM 页面白屏、卡死 | `markBanked()` 扫描整个 `document.body`，把生词本里的高频词全部包进 `<span>`；实测一个 GitHub 式页面 15,030 → 43,032 个元素，插入 28,002 个标记。DOM 重建拖死主线程，且被替换的文本节点会让 React/Vue 按旧引用操作时拿到已脱离文档的节点 | 只在 `readScope()` 识别出的正文容器内标记，识别不出完全不碰；上限 2,500 个文本节点 / 600 个标记；跳过 `code/pre/textarea` 等 |
+| 全站布局错位 | `content.css` 里 `p, blockquote, li, h1..h6 { position: relative }` 接管了整站定位上下文（单页实测 4,001 个元素） | 删除该规则，改为鼠标悬停到某一段、要挂星标时只给那一个元素补 `position: relative` |
+| 页脚/整页被藏掉 | Cookie 弹层判据 `r.bottom > innerHeight - 40` 对视口下方元素同样成立，把页脚 `display:none`；「高度 > 半屏」又会把应用外壳认成同意条 | 收紧为：必须 `fixed`/`sticky`、与视口有交集、文字 < 1,200 字、内部有按钮，隐藏前再校验不含正文容器 |
+| 鼠标整站失效 | 把 `.qc-cmp-ui-content` 等遮罩的**父元素**设成 `pointer-events: none` | 整段删除 |
+| 用户菜单被当推销气泡藏掉 | `killPitch` 遍历全页 `div/aside/section/a/span` 逐个取 `innerText`（每次强制重排），且只按文案匹配 | 改为按类名筛候选（上限 200）、用 `textContent`、必须带关闭键或类名含 `tooltip/popup`、最多 6 轮 |
+| 关掉插件后正文缺词 | `.wk-banked` 在关闭态是 `display:none`，被标记的词直接从正文消失 | 关闭态只还原装饰（去下划线、去底色、继承字色），文字一个不少 |
+| MutationObserver 自激 | 自己写 DOM 触发观察器，又触发重扫 | 加 `selfWriting` 标记，自己造成的变动一律忽略 |
+
+同批修掉的小问题：重点词红色虚线被站点样式抢回（补 `!important` 与 `-webkit-text-fill-color`）、`pickArticleRoot()` 里大量 `innerText` 强制重排（改 `textContent`）、`decorateArticle()` 在识别不出正文时不再给 `body` 打 `data-wk-read`。
+
+验证方式：用真实 Chromium + CDP 加载扩展，对 6 类页面做对照（GitHub 式巨型 DOM / 应用外壳 + cookie 条 / 公众号式无 `article` / 框架式频繁重渲染 / 真实文章页 / cookie 功能组）。前三类页面现在**改动 0 个 DOM 节点**，文章页的划线、星标、翻译、Cookie 自动接受全部照常。
+
+### 0.1.0 — 首个公开版本
+
+点词查义、双击入生词本、拖选翻译、悬停收藏句子；本地词典 59,137 词离线可查；生词本支持导出 Anki / TXT。

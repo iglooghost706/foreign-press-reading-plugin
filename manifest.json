@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "外刊阅读",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "点词查义、双击入生词本、拖选词组/句子翻译 —— 直接在网页上读外刊。",
   "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAudmQjZFByMDGcbHfEztf+Z1R2IkEERuXk87OXG2ZDuc+uXjMm3nOwu8RCktmOBYrzAm2mR2SNI/Ll39TvXAll9OgyKtUlh4oXVox+zNw83epEG59jxGvu5RoGKbfkMAQomMew7MsJjwCL49lVubeahb8uCuJjzGuIbeHjswgvE4hechgIGT9t69ip7udU6z9OGaEunuEaTn3wF89LmD7Hk9PHiT41OaNMvLBxjSm+G7tSJylICu6Y6lICwLQiXDxTYmcZ2NgenMOqpqZEiIs/4kXu666FeG01OG3TQJjOsIRxo12UP49A9I1zkDJXjuVTKY3xqSl1N4eVGgiR0TKPwIDAQAB",
   "permissions": ["storage", "activeTab", "scripting"],

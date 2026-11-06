@@ -58,11 +58,22 @@
 :root.wk-off .wk-pop,
 :root.wk-off .wk-star,
 :root.wk-off .wk-link-fab,
-:root.wk-off .wk-toast,
-/* 重点词（.wk-key）只是 .wk-banked 的修饰类，本身不产生盒子，
-   靠上面的 .wk-banked 一并隐藏即可，无需单独列。 */
-:root.wk-off .wk-banked {
+:root.wk-off .wk-toast {
   display: none !important;
+}
+
+/* ★ 生词标记**不能** display:none。
+ *   标记是把正文里的词包进 <span>，一旦整块隐藏，被标记的词会从正文里
+ *   凭空消失 —— 用户看到的是"关掉插件后文章缺词少句"，比不关还糟。
+ *   关闭态只把装饰还原成普通文字，词一个都不能少。 */
+:root.wk-off .wk-banked,
+:root.wk-off .wk-banked.wk-key {
+  border-bottom: 0 !important;
+  background: transparent !important;
+  color: inherit !important;
+  -webkit-text-fill-color: inherit;
+  font-weight: inherit;
+  cursor: auto;
 }
 
 /* ---------- 释义浮层 ---------- */
@@ -153,11 +164,18 @@
   cursor: help;
 }
 
-/* ---------- 重点词语：红色虚线，比普通生词更醒目 ---------- */
+/* ---------- 重点词语：红色虚线 + 红字，比普通生词更醒目 ---------- */
 .wk-banked.wk-key {
-  border-bottom-color: #d93025;
+  /* !important 是必须的：站点自己的规则（如 article p span / .content a）
+     特异性比我们高，会把 color 抢回去 —— 于是页面上只剩背景泛红、
+     字母仍是近黑色。背景和虚线之所以"看起来生效"，只是站点很少给行内
+     span 设这两个属性。 -webkit-text-fill-color 单独兜一层：
+     WebKit 里它优先于 color，有些站点会用它做渐变字。 */
+  border-bottom-color: #d41f14 !important;
+  color: #d41f14 !important;
+  -webkit-text-fill-color: #d41f14;
   font-weight: 600;
-  background: rgba(217, 48, 37, .07);
+  background: rgba(212, 31, 20, .10) !important;
 }
 
 /* 重点标记按钮所在的第二行：和移除按钮分开，避免误点 */
@@ -238,13 +256,13 @@
   box-shadow: 0 2px 8px rgba(0, 0, 0, .28);
 }
 .wk-star:focus-visible { outline: 2px solid var(--wk-ac); outline-offset: 2px; }
-/* ★ 标题（h1/h2/h3）也要定位上下文。
-     attachStar 挂在 p, blockquote, h1, h2, h3, li 上，
-     但这里原来只写了 p, blockquote, li —— 标题是 position:static，
-     星标就以最近的定位祖先（body/html）为准，统统跑到页面右上角叠在一起。 */
-p, blockquote, li, h1, h2, h3, h4, h5, h6 {
-  position: relative;
-}
+/* ★ 这里原来有一条**全局**规则：
+ *     p, blockquote, li, h1..h6 { position: relative; }
+ *   目的是给星标一个定位上下文。代价是接管了整站：实测一个 GitHub 式页面
+ *   上有 4001 个 p/li/h* 被改成 relative，站点自己靠 absolute 定位的下拉层、
+ *   粘性表头、虚拟列表全部换了参照物，布局会散、部分站点直接白屏。
+ *   现在改成按需：只在**鼠标真的悬停到某一段**、要挂星标时，由 attachStar()
+ *   给那一个元素补 position:relative（见 content.js），全页最多同时一个。 */
 
 /* ---------- 右下角工具坞 ----------
    四个按钮收进同一条胶囊里：模式 · 星标 · 网址 · 电源。

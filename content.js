@@ -87,7 +87,7 @@
       lemma: '原形', addSentence: '收藏句子', addPhrase: '收藏词组', addPara: '收藏段落',
       addLink: '收藏网址', bookmarked: '该文章已收藏过', link: '链接',
       savedAlready: '该内容已收藏过',
-      copied: '已复制', onTip: '外刊阅读：已开启（点此关闭）', onToast: '外刊阅读：已开启',
+      copy: '复制', copied: '已复制', onTip: '外刊阅读：已开启（点此关闭）', onToast: '外刊阅读：已开启',
       off: '已关闭（点此开启）',
       navBlocked: '链接跳转：全部阻止（点此切到允许）',
       navAllowed: '链接跳转：全部允许（点此切到智能）',
@@ -115,7 +115,7 @@
       addSentence: 'Save sentence', addPhrase: 'Save phrase', addPara: 'Save paragraph',
       addLink: 'Save link', bookmarked: 'Already bookmarked', link: 'Link',
       savedAlready: 'Already saved',
-      copied: 'Copied', onTip: 'Reading mode: on (click to turn off)', onToast: 'Reading mode: on',
+      copy: 'Copy', copied: 'Copied', onTip: 'Reading mode: on (click to turn off)', onToast: 'Reading mode: on',
       off: 'Off (click to turn on)',
       navBlocked: 'Link jump: block all (click for allow)',
       navAllowed: 'Link jump: allow all (click for smart)',
@@ -482,7 +482,7 @@
       '<div class="wk-acts"><button class="wk-btn" data-a="save">' +
       t(isSent ? 'addSentence' : 'addPhrase') +
       '</button>' +
-      '<button class="wk-btn" data-a="copy">' + t('copied') + '</button></div>', { wide: true });
+      '<button class="wk-btn" data-a="copy">' + t('copy') + '</button></div>', { wide: true });
     const copyBtn = popEl.querySelector('[data-a="copy"]');
     if (copyBtn) copyBtn.onclick = () => {
       navigator.clipboard.writeText(body).then(() => {
@@ -653,6 +653,18 @@
       /* 兜底：同一时刻只留一个星标，把之前漏下的清掉 */
       closeOtherStars(el);
       if (el.querySelector(':scope > .wk-star')) return;   // 已在，别重复建
+      /* 星标是 absolute 定位，需要定位上下文。以前靠 content.css 里一条
+         全局规则把所有 p/li/h* 都改成 relative —— 那等于接管整站布局
+         （实测单页 4001 个元素被改）。现在只给"当前这一段"补，用完即止。 */
+      if (!el.__wkRelSet) {
+        el.__wkRelSet = true;
+        try {
+          if (getComputedStyle(el).position === 'static') {
+            el.style.position = 'relative';
+            el.__wkRelOwn = true;
+          }
+        } catch (e) {}
+      }
       const r = document.createElement('button');
       r.className = 'wk-star';
       r.textContent = '☆';
@@ -787,13 +799,100 @@
     return false;
   }
 
-  function markBanked() {
-    // 清掉旧标记
-    document.querySelectorAll('.wk-banked').forEach((e) => {
-      const w = e.textContent;
-      e.replaceWith(document.createTextNode(w));
-    });
+  /* ---------- 标记范围：只在正文里动页面 ----------
+   * ★ 白屏的根因就在这里。
+   *   旧版 markBanked() 对整个 document.body 做标记：只要生词本里有
+   *   the / of / in 这类高频词，一个 GitHub 级别的页面会被塞进上万个
+   *   <span>（探针实测 tools/probe-compat.js：15030 → 43032 个元素、
+   *   28002 个标记）。后果是两层：
+   *     ① 主线程被 DOM 重建拖住，页面长时间空白、无法交互；
+   *     ② React / Vue 管理的文本节点被我们换成了自己造的 span，
+   *        框架再按旧引用写 nodeValue / removeChild 时拿到的是已脱离文档的
+   *        节点，轻则内容不再更新，重则抛错把整个组件树卸载 —— 正是白屏。
+   *   所以现在：① 只标记识别出的正文容器；② 识别不出来就完全不碰；
+   *   ③ 扫描节点数与插入标记数都有硬上限。 */
+  const MARK_MAX_NODES = 2500;   // 最多检查多少个文本节点
+  const MARK_MAX_SPANS = 600;    // 最多插入多少个标记，超了就停
+  const MARK_BLOCK_SEL = 'p, li, blockquote, td, th, dd, dt, figcaption, h1, h2, h3, h4, h5, h6';
+  const MARK_SKIP_TAGS = /^(SCRIPT|STYLE|NOSCRIPT|TEXTAREA|TITLE|OPTION|SELECT|CODE|PRE|KBD|SAMP|VAR|CANVAS|IFRAME|svg)$/i;
+
+  let scopeCache = { url: '', at: 0, el: null };
+
+  /* "整页就是一篇文章"的保守判定：只用于 pickArticleRoot() 失手时兜底。
+     应用型页面（元素多、链接占比高、没有成片长段落）一律不通过 ——
+     GitHub、后台控制台、官网首页都过不了这一关。 */
+  function bodyIsArticleish () {
+    const body = document.body;
+    if (!body) return false;
+    if (document.querySelectorAll('*').length > 6000) return false;
+    let longP = 0;
+    for (const p of body.querySelectorAll('p')) {
+      if ((p.textContent || '').trim().length >= 60) longP++;
+      if (longP >= 5) break;
+    }
+    if (longP < 5) return false;
+    const total = (body.textContent || '').length;
+    if (!total) return false;
+    let linkChars = 0;
+    for (const a of body.querySelectorAll('a')) linkChars += (a.textContent || '').length;
+    return linkChars / total <= 0.35;
+  }
+
+  /** 当前页面"可以动"的范围；null = 这不是可读页面，一律不碰。 */
+  function readScope () {
+    const url = location.href;
+    const now = Date.now();
+    if (scopeCache.url === url && now - scopeCache.at < 5000) return scopeCache.el;
+    let el = null;
+    try { el = pickArticleRoot(); } catch (e) { el = null; }
+    if (!el && bodyIsArticleish()) el = document.body;
+    if (el && !looksLikeArticle(el)) el = null;
+    scopeCache = { url: url, at: now, el: el };
+    return el;
+  }
+
+  /* 最后一道闸：即使 pickArticleRoot() 猜到了某个容器，也要它真的"像文章"。
+     应用页面（控制台、仓库页、编辑器）元素密度极高、文字大多不在段落里，
+     在这里被挡掉，扩展就彻底不碰它的 DOM。 */
+  function looksLikeArticle (el) {
+    const text = (el.textContent || '').trim();
+    if (text.length < 800) return false;
+    const els = el.querySelectorAll('*').length;
+    if (!els || els > 15000) return false;
+    if (text.length / els < 8) return false;          // 元素比文字还密 → 应用界面
+    let longP = 0;
+    for (const p of el.querySelectorAll('p')) {
+      if ((p.textContent || '').trim().length >= 60) longP++;
+      if (longP >= 2) break;
+    }
+    return longP >= 2;
+  }
+
+  function clearMarks () {
+    const list = document.querySelectorAll('.wk-banked');
+    if (!list.length) return;
+    for (const e of list) {
+      try { e.replaceWith(document.createTextNode(e.textContent)); } catch (err) {}
+    }
+  }
+
+  /* 我们自己写 DOM 时置位：MutationObserver 看到这些变动必须忽略，
+     否则"改 DOM → 观察器 → 再改 DOM"会自激成死循环（页面越跑越卡直到白屏）。 */
+  let selfWriting = 0;
+  function beginSelfWrite () { selfWriting++; }
+  function endSelfWrite () { setTimeout(() => { if (selfWriting > 0) selfWriting--; }, 0); }
+
+  function markBanked () {
+    beginSelfWrite();
+    try { markBankedInner(); } finally { endSelfWrite(); }
+  }
+
+  function markBankedInner() {
+    clearMarks();
     if (!bank.length) return;
+    /* 不在正文范围内就收手：应用页面、编辑器、控制台一个词都不标。 */
+    const scope = readScope();
+    if (!scope) return;
     /* forms: 词形列表。额外维护 keyForms —— 重点词的所有词形集合，
        命中其中之一就打上 .wk-key，网页上显示为红色虚线。 */
     const forms = new Map();
@@ -812,23 +911,30 @@
         }
       }
     }
-    const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, {
+    const walker = document.createTreeWalker(scope, NodeFilter.SHOW_TEXT, {
       acceptNode(n) {
         if (!n.nodeValue || !n.nodeValue.trim()) return NodeFilter.FILTER_REJECT;
         const p = n.parentElement;
         if (!p) return NodeFilter.FILTER_REJECT;
-        const tag = p.tagName;
-        if (tag === 'SCRIPT' || tag === 'STYLE' || tag === 'NOSCRIPT') return NodeFilter.FILTER_REJECT;
+        if (MARK_SKIP_TAGS.test(p.tagName)) return NodeFilter.FILTER_REJECT;
         if (p.closest(UI_SEL + ', [contenteditable="true"]')) return NodeFilter.FILTER_REJECT;
+        /* 只认正文块里的文字：导航条、按钮、图标旁边的零散文本一律不碰。
+           这一条同时挡掉了大部分"站点自己会重渲染"的框架节点。 */
+        if (!p.closest(MARK_BLOCK_SEL)) return NodeFilter.FILTER_REJECT;
         if (isChrome(p)) return NodeFilter.FILTER_REJECT;
         return NodeFilter.FILTER_ACCEPT;
       }
     });
     const targets = [];
     let n;
-    while ((n = walker.nextNode())) targets.push(n);
+    while ((n = walker.nextNode())) {
+      targets.push(n);
+      if (targets.length >= MARK_MAX_NODES) break;
+    }
     const WORD = wordRe();
+    let marks = 0;
     for (const node of targets) {
+      if (marks >= MARK_MAX_SPANS) break;
       const text = node.nodeValue;
       if (!hasWord(text)) continue;
       let m, last = 0, frag = null;
@@ -865,10 +971,11 @@
         s.title = isKey ? '重点词语：' + raw : '生词本：' + raw;
         frag.appendChild(s);
         last = m.index + raw.length;
+        if (++marks >= MARK_MAX_SPANS) break;
       }
       if (frag) {
         if (last < text.length) frag.appendChild(document.createTextNode(text.slice(last)));
-        node.parentNode.replaceChild(frag, node);
+        try { node.parentNode.replaceChild(frag, node); } catch (e) {}
       }
     }
   }
@@ -1585,6 +1692,10 @@
        于是**从侧边栏切换总开关**时，浮层/星标/toast 的隐藏样式完全没跟着变 ——
        关了照样弹释义。这条补上，与按钮点击走同一套状态。 */
     r.classList.toggle('wk-off', !prefs.on);
+    /* 关闭时把标记整体撤掉：留着就是几百上千个 span 挂在页面上，
+       而且关闭态样式一旦处理不好会把词本身藏起来（content.css 里那条
+       display:none 的老写法就是这么把正文弄缺字的）。 */
+    if (!prefs.on) { try { clearMarks(); } catch (e) {} }
     /* 总开关 / 星标开关 —— 任何一个关掉，都要把已出现的星标清干净，
        不然会留下"关了也不消失"的残星 */
     if (!prefs.on || prefs.starOn === false) closeOtherStars(null);
@@ -1604,7 +1715,9 @@
     const longParas = (el) => {
       let n = 0;
       for (const p of el.querySelectorAll('p')) {
-        if ((p.innerText || '').trim().length >= 60) n++;
+        /* 用 textContent 而不是 innerText：innerText 每次都要强制重排，
+           在万级元素的页面上逐个取能把主线程按住好几秒。 */
+        if ((p.textContent || '').trim().length >= 60) n++;
       }
       return n;
     };
@@ -1612,10 +1725,10 @@
        实测：BBC 首页 0.99（卡片标题几乎全是链接）、BBC 文章页 0.03、
        维基条目 0.39。列表页不该被阅读设置接管，否则整屏卡片字号被拉大。 */
     const linkRatio = (el) => {
-      const total = (el.innerText || '').length;
+      const total = (el.textContent || '').length;
       if (!total) return 1;
       let n = 0;
-      for (const a of el.querySelectorAll('a')) n += (a.innerText || '').length;
+      for (const a of el.querySelectorAll('a')) n += (a.textContent || '').length;
       return n / total;
     };
     const isArticleish = (el) => el && longParas(el) >= 2 && linkRatio(el) <= 0.6;
@@ -1642,7 +1755,7 @@
     const score = new Map();
     let long = 0;
     for (const p of document.querySelectorAll('p')) {
-      if ((p.innerText || '').trim().length < 60) continue;
+      if ((p.textContent || '').trim().length < 60) continue;
       long++;
       let el = p.parentElement, depth = 0;
       while (el && el !== document.body && depth < 6) {
@@ -1660,24 +1773,27 @@
   function decorateArticle() {
     const root = document.body;
     if (!root) return;
-    // 取文章主体：优先常见容器，退回 body
-    const picked = pickArticleRoot();
-    /* 标记只在识别出真正的正文容器时打；退回 body 时不打，
-       否则整页的 p/li（含导航）都会被阅读设置接管。 */
-    if (picked) {
-      for (const old of document.querySelectorAll('[data-wk-read]')) {
-        if (old !== picked) old.removeAttribute('data-wk-read');
-      }
-      if (!picked.hasAttribute('data-wk-read')) picked.setAttribute('data-wk-read', '');
+    /* 取文章主体：识别不出来就**什么都不挂**。
+       旧版退回 document.body，于是 GitHub 这种页面上 4000 多个 p/li/h*
+       全被挂上 mouseenter 监听，鼠标一扫就四处建星标。 */
+    const picked = readScope();
+    if (!picked) { pickTitle(); return; }
+    for (const old of document.querySelectorAll('[data-wk-read]')) {
+      if (old !== picked) old.removeAttribute('data-wk-read');
     }
-    const art = picked || root;
+    if (!picked.hasAttribute('data-wk-read')) picked.setAttribute('data-wk-read', '');
+    const art = picked;
     const blocks = art.querySelectorAll('p, blockquote, h1, h2, h3, li');
     let i = 0;
     for (const el of blocks) {
+      if (i >= 400) break;                 // 正文再长也不挂第 401 个
       if (el.__wkDone) continue;
       el.__wkDone = true;
       // 段落太短或含大量链接，跳过（多半是导航/推荐位）
-      const txt = (el.innerText || '').trim();
+      /* 判长度用 textContent：innerText 每次都会强制重排，这里一轮要过
+         最多 400 个块元素，用 innerText 就是 400 次重排。真正取正文
+         仍然走 innerText，但那是用户点星标时才取一次（见下面的闭包）。 */
+      const txt = (el.textContent || '').trim();
       if (txt.length < 20) continue;
       /* ★ 链接数判据原来写死 >6，实测把 BBC 这类正文**整段挂在 <a> 里**的
        * 文章全跳过了 → 星标永远不出现。这里改成按"链接文字占整段的比例"判断：
@@ -1685,7 +1801,7 @@
        * 推荐位）才跳过。 */
       const links = el.querySelectorAll('a');
       if (links.length > 6) {
-        const linkChars = [...links].reduce((n, a) => n + (a.innerText || '').trim().length, 0);
+        const linkChars = [...links].reduce((n, a) => n + (a.textContent || '').trim().length, 0);
         if (linkChars > txt.length * 0.6) continue;   // 八成以上是链接 → 推荐位
       }
       attachStar(el, () => (el.innerText || '').trim(), 'para');
@@ -1709,6 +1825,8 @@
       mountNavFab();
       mountStarFab();
       mountLinkFab();
+      /* 从关闭切回开启：标记要在正文里补回来 */
+      if (prefs.on) markBanked();
     }
     if (changes[KEY_BANK]) { bank = changes[KEY_BANK].newValue || []; markBanked(); }
     if (changes[KEY_REPO]) repo = changes[KEY_REPO].newValue || [];
@@ -1741,13 +1859,21 @@
       if (pending) return;
       pending = setTimeout(() => {
         pending = null;
-        decorateArticle();
-        /* 新渲染出来的正文里，生词本里已有的词也要补上标记 */
-        markBanked();
-      }, 300);
+        beginSelfWrite();
+        try {
+          decorateArticle();
+          /* 新渲染出来的正文里，生词本里已有的词也要补上标记 */
+          markBankedInner();
+        } finally { endSelfWrite(); }
+      }, 600);
     };
     try {
-      new MutationObserver(schedule).observe(document.body, { childList: true, subtree: true });
+      new MutationObserver((recs) => {
+        /* 自己写的 DOM 变动不算"页面变了"，否则会无限重扫 */
+        if (selfWriting) return;
+        if (document.hidden) return;
+        schedule();
+      }).observe(document.body, { childList: true, subtree: true });
     } catch (e) { /* 极端情况下没有 body，忽略 */ }
 
     // SPA 路由变化后重新装饰
@@ -1780,20 +1906,30 @@
       '[class*="consent" i][class*="banner" i]', '[aria-label*="cookie" i][role="dialog"]'
     ].join(',');
 
-    /** 判断某个元素是不是同意弹层 */
+    /** 判断某个元素是不是同意弹层
+     *  ★ 旧判据有两个坑（tools/probe-compat.js 实测复现）：
+     *    ① nearBottom 只写 `r.bottom > innerHeight - 40` —— 页脚在视口**下方**
+     *      几万像素处，这个式子照样成立，于是"页脚"被当成同意条整块 display:none；
+     *    ② fullScreen（高度 > 半屏）会把"撑满整屏的应用外壳"也认成同意条，
+     *      一旦它的文字里出现 cookie，整站就被藏掉 —— 这就是白屏。
+     *    现在四条缺一不可：真的在视口里 / 必须是 fixed|sticky 浮层 /
+     *    文字量小 / 里面确实有可点的按钮。 */
     function isCookieBox (el) {
       if (!el || !el.getBoundingClientRect) return false;
-      // 已在视口外的（display:none）不处理
+      const cs = getComputedStyle(el);
+      if (cs.display === 'none' || cs.visibility === 'hidden') return false;
+      if (cs.position !== 'fixed' && cs.position !== 'sticky') return false;
       const r = el.getBoundingClientRect();
       if (!r.width || !r.height) return false;
-      // 真正的弹层一般贴着视口底部或占据整屏
-      const nearBottom = r.bottom > window.innerHeight - 40;
-      const fullWidth = r.width > window.innerWidth * 0.6;
-      const fullScreen = r.height > window.innerHeight * 0.5;
-      if (!(nearBottom || fullScreen || (fullWidth && r.height > 90))) return false;
-      // 文案里出现 cookie/consent 才认，避免误伤正文里的 "cookie policy" 链接
-      const txt = (el.innerText || el.textContent || '').slice(0, 700);
-      return COOKIE_TXT.test(txt);
+      // 必须和视口有交集：滚到下面去的页脚、正文区块一律不认
+      if (r.bottom <= 0 || r.top >= window.innerHeight) return false;
+      // 盖满整屏的容器不是同意条，是应用外壳
+      if (r.width > window.innerWidth * 0.98 && r.height > window.innerHeight * 0.98) return false;
+      const txt = (el.textContent || '').slice(0, 700);
+      if (!COOKIE_TXT.test(txt)) return false;
+      if ((el.textContent || '').length > 1200) return false;   // 长文不是同意条
+      if (!el.querySelector('button, [role="button"], a[href], input[type="button"], input[type="submit"]')) return false;
+      return true;
     }
 
     /** 找到弹层里"同意类"的按钮（排除拒绝类） */
@@ -1834,7 +1970,11 @@
         if (btn) {
           try { btn.click(); } catch (e) { /* 跨域 iframe 之类，点不到就算了 */ }
         } else {
-          // 找不到同意按钮（常见于 iframe 里的弹层）→ 直接隐藏，别让它挡着正文
+          // 找不到同意按钮（常见于 iframe 里的弹层）→ 隐藏它，别让它挡着正文。
+          // 隐藏前再确认一次：正文容器、应用外壳绝不能藏。
+          const scopeEl = readScope();
+          if (scopeEl && box.contains(scopeEl)) continue;
+          if ((box.textContent || '').length > 1500) continue;
           try { box.style.display = 'none'; box.setAttribute('data-wk-cookie', 'hidden'); } catch (e) {}
         }
       }
@@ -1852,11 +1992,13 @@
       }).observe(document.body, { childList: true, subtree: true });
     } catch (e) {}
 
-    // 标签页遮罩类弹层（点空白处关不掉的）：一并尝试关闭
-    try {
-      const blockers = document.querySelectorAll('.qc-cmp-ui-content, .truste_box, #usercentrics-root');
-      blockers.forEach((b) => { if (b && b.parentElement) b.parentElement.style.pointerEvents = 'none'; });
-    } catch (e) {}
+    /* ★ 这里原来还有一段：
+     *     document.querySelectorAll('.qc-cmp-ui-content, .truste_box, #usercentrics-root')
+     *       .forEach(b => b.parentElement.style.pointerEvents = 'none')
+     *   它把**任意父元素**设成 pointer-events:none。这些 CMP 的父级常常就是
+     *   页面主容器（甚至 body 的直接子元素），一旦命中，整站鼠标全部失效 ——
+     *   用户看到的就是"页面在、但点什么都没反应，等于用不了"。
+     *   关闭弹层的需求已由上面的 handleCookie() 覆盖，这段删除。 */
 
     /* ---------- 登录/订阅提示气泡 ----------
        不是法律弹层，但同样挡住正文阅读（Al Jazeera 的黑色 "signing in" 气泡、
@@ -1864,122 +2006,75 @@
        策略：只认「带关闭按钮 + 文案像推销」的浮层，优先点关闭；
        点不到就直接隐藏。比 cookie 判定更保守，避免误伤正文里的推荐位。 */
     const PITCH_TXT = /(sign in|signing in|log ?in|subscribe|subscription|create (an )?account|become a member|注册|登录|订阅|开通会员)/i;
-    // 已压制过的气泡选择器（站点重建同类气泡时复用）
-    killPitch.blocked = new Set();
 
-    /* 定位推销气泡的可靠判据（实测 Al Jazeera 的完整结构得到）：
-         <a class="tooltip tooltip--bottom-right" style="position:absolute; z-index:100">   ← 气泡本体
-           <button id="user-accounts-tooltip" class="tooltip_text">                            ← 关闭键(×)
-           …文案…
-         </a>
-       气泡本体挂在 .tooltip_container 里，而容器自己是 position:relative、无阴影、透明背景。
+    /* 候选集只从"名字像浮层"的元素里取。
+       ★ 旧版直接对全页 `div, aside, section, a, span` 逐个取 innerText：
+         ① innerText 每次都会强制重排，一个 GitHub 级别的页面就是上万次重排，
+            主线程被按住，页面长时间白屏无响应；
+         ② 判据只看"文案像推销 + 绝对定位 + 不太大"，于是 GitHub 自己的用户菜单
+            （.popover 里写着 "Sign in to GitHub / Subscribe"）被当成推销气泡藏掉 ——
+            实测探针里 `wkPitchNodes:1` 命中的就是它。
+       现在先按类名筛候选（一次选择器查询，不碰布局），再逐个用 textContent 判文案。 */
+    const PITCH_SEL = [
+      '[class*="tooltip" i]', '[class*="popover" i]', '[class*="banner" i]',
+      '[class*="signup" i]', '[class*="signin" i]', '[class*="subscribe" i]',
+      '[class*="promo" i]', '[class*="modal" i]', '[class*="overlay" i]',
+      '[id*="tooltip" i]', '[id*="popover" i]', '[id*="banner" i]'
+    ].join(',');
 
-       ★ 前一版没生效的原因有两处，都已定位：
-         ① "是不是浮层"用 position/shadow/背景色判断 → 容器三条全不中，被放过；
-         ② 真正的气泡在容器**上面一层**，我却只在容器里**向下**找关闭键，方向反了。
-
-       现在改成：从匹配文案的元素**向上**找定位祖先，那才是气泡本体；
-       再在它内部找"空按钮"（× 通常无文字）点掉。找不到按钮才隐藏本体。 */
     function findPitchBubble (el) {
-      if (!PITCH_TXT.test((el.innerText || '').slice(0, 300))) return null;
-      /* ★ 这里原来从 el.parentElement 往上找定位祖先，漏掉了 el 自己。
-         而 Al Jazeera 的气泡恰好是 <a class="tooltip" style="position:absolute">——
-         **它自己的** position 就是 absolute，祖先链上的
-         .tooltip_container 是 relative、header 是 relative，一路到 BODY 都不是
-         absolute/fixed，于是永远找不到气泡，19 个文案命中的元素全部落空。
-         必须先检查 el 自己。 */
-      const self = getComputedStyle(el);
-      if (self.position === 'absolute' || self.position === 'fixed') {
-        if (elSizeOK(el)) return el;
-      }
-      let a = el.parentElement, bubble = null;
-      while (a && a.tagName !== 'BODY') {
-        const cs = getComputedStyle(a);
-        if (cs.position === 'absolute' || cs.position === 'fixed') { bubble = a; break; }
-        a = a.parentElement;
-      }
-      if (!bubble) return null;
-      if (!PITCH_TXT.test((bubble.innerText || '').slice(0, 300))) return null;
-      return elSizeOK(bubble) ? bubble : null;
-    }
-
-    /* 尺寸只用来"排除整页级容器"，不能用来判断"是否存在"——
-       气泡用 clip/transform 定位时 getBoundingClientRect() 会返回 0×0，
-       但它明明在屏幕上看得见（Al Jazeera 实测）。 */
-    function elSizeOK (el) {
+      if (!el || el.nodeType !== 1) return null;
+      if (el.hasAttribute('data-wk-pitch') || el.hasAttribute('data-wk-cookie')) return null;
+      const txt = (el.textContent || '').trim();
+      if (!txt || txt.length > 400) return null;           // 长文是正文，不是气泡
+      if (!PITCH_TXT.test(txt)) return null;
+      const cs = getComputedStyle(el);
+      if (cs.position !== 'absolute' && cs.position !== 'fixed') return null;
+      if (cs.display === 'none' || cs.visibility === 'hidden') return null;
       const r = el.getBoundingClientRect();
-      return !(r.width > window.innerWidth * 0.7 || r.height > window.innerHeight * 0.6);
+      if (!r.width || !r.height) return null;
+      if (r.bottom <= 0 || r.top >= window.innerHeight) return null;          // 视口外不处理
+      if (r.width > window.innerWidth * 0.7 || r.height > window.innerHeight * 0.6) return null;
+      /* 导航菜单不算推销气泡：菜单本质是"一串链接 + 表单"，而推销气泡是
+         "一段文案 + 一个关闭键"。GitHub 顶部的用户菜单（Sign in / Subscribe）
+         正好会被文案判据命中，靠这条挡掉。 */
+      if (el.querySelectorAll('a[href]').length >= 2) return null;
+      if (el.querySelector('input, form, select, textarea')) return null;
+      /* 真气泡要么带关闭键（button），要么类名就叫 tooltip/popup/toast。
+         只有文案像推销、却既没关闭键也不是 tooltip 的，多半是站点的下拉菜单。 */
+      const hasClose = !!el.querySelector('button, [role="button"]');
+      const nameish = /tooltip|popup|toast/i.test(String(el.className || '') + ' ' + String(el.id || ''));
+      if (!hasClose && !nameish) return null;
+      /* 绝不能把正文容器/应用外壳当气泡藏掉 */
+      const scopeEl = readScope();
+      if (scopeEl && el.contains(scopeEl)) return null;
+      return el;
     }
 
-    /* ★ 这里原来还会点"空按钮"的关闭键，已删除 —— 那是个定时炸弹。
-
-       对照实验（同一台机器、同一网络、同一 URL）：
-         改动前：edition.cnn.com 20 秒加载完成，8389 字符，29 处标记
-         改动后：dom-ready 每秒触发一次，40 秒内 46 次 —— 无限重载
-
-       原因：killPitch 每 1.2 秒扫一遍，找到"文案含 subscribe/sign in
-       且是 absolute/fixed 定位"的小容器后，就去点里面第一个**空按钮**。
-       但页面上"文案含 subscribe"的定位元素多半是导航项，它的空按钮就是
-       导航触发器 —— 一键就跳页，页面重载后我的代码又点一次，于是成环。
-
-       隐藏浮层本身就够了，不点任何东西：
-         · 不会误触导航/购买/登录等有副作用的控件
-         · 不会触发重定向，也就绝不可能形成重载循环
-       cookie 横幅那边保留"点接受"，因为那是用户明确要求的行为，
-       且只点文案明确是 Accept 的按钮，判据严格，不涉及这种情况。 */
-    function closeBubble (bubble) {
-      const cls = (typeof bubble.className === 'string' ? bubble.className : '').trim();
-      const sig = cls ? '.' + cls.split(/\s+/).slice(0, 2).join('.') : '';
-      if (sig) {
-        killPitch.blocked.add(sig);
-        if (killPitch.blocked.size > 12) killPitch.blocked.clear();
-        // 同一类气泡可能有多个，全部按下去
-        for (const e of document.querySelectorAll(sig)) {
-          if (!PITCH_TXT.test((e.innerText || '').slice(0, 300))) continue;
-          if (!elSizeOK(e)) continue;
-          try {
-            e.style.setProperty('display', 'none', 'important');
-            e.setAttribute('data-wk-pitch', 'hidden');
-          } catch (err) {}
-        }
-      }
-      try {
-        bubble.style.setProperty('display', 'none', 'important');
-        bubble.setAttribute('data-wk-pitch', 'hidden');
-        return true;
-      } catch (e) {}
-      return false;
-    }
-
+    /* 只隐藏、不点任何按钮（点按钮的历史教训见 tools/probe-pitch.js：
+       误点导航触发器会导致页面反复重载）。 */
     function killPitch () {
-      // MutationObserver 每次 DOM 变动都会触发；节流到 2.5 秒一次。
-      // （现在只做隐藏、不点按钮，风险比原先低，但扫描仍是全量的。）
       const now = Date.now();
-      if (now - killPitch._t < 2500) return;
+      if (now - killPitch._t < 4000) return;      // 节流 4 秒
       killPitch._t = now;
-
-      // 先把"记住"的同类气泡重新按下去（站点重建后属性标记会丢）
-      for (const sig of killPitch.blocked) {
-        for (const e of document.querySelectorAll(sig)) {
-          if (!PITCH_TXT.test((e.innerText || '').slice(0, 300))) continue;
-          if (!elSizeOK(e)) continue;         // 只排除整页级容器；0×0 的也要处理
-          try { e.style.setProperty('display', 'none', 'important'); } catch (err) {}
-        }
-      }
-
-      const all = document.querySelectorAll('div, aside, section, a, span');
-      for (const el of all) {
-        if (el.hasAttribute('data-wk-pitch') || el.hasAttribute('data-wk-cookie')) continue;
-        if (el.children.length > 3) continue;      // 只从近叶子出发，避免重复处理
+      if ((killPitch._n = (killPitch._n || 0) + 1) > 6) return;   // 最多 6 轮，不常驻
+      let cands;
+      try { cands = document.querySelectorAll(PITCH_SEL); } catch (e) { return }
+      let i = 0;
+      for (const el of cands) {
+        if (++i > 200) break;                     // 候选上限 200
         const bubble = findPitchBubble(el);
         if (!bubble) continue;
-        if (!closeBubble(bubble)) break;
+        try {
+          bubble.style.setProperty('display', 'none', 'important');
+          bubble.setAttribute('data-wk-pitch', 'hidden');
+        } catch (err) {}
       }
     }
 
-    for (const ms of [2000, 5000, 9000, 15000, 22000]) setTimeout(killPitch, ms);
+    for (const ms of [2000, 6000, 12000, 20000]) setTimeout(killPitch, ms);
     try {
-      new MutationObserver(() => killPitch())
+      new MutationObserver(() => { if (!document.hidden) killPitch() })
         .observe(document.body, { childList: true, subtree: true });
     } catch (e) {}
   })();
